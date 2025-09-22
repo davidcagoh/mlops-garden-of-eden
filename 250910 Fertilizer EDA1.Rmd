@@ -1,0 +1,67 @@
+---
+title: "Fertilizer Dataset Exploration"
+author: "David Goh"
+date: "2025-09-10"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+``` {r load-libraries, include=FALSE }
+# packages
+if(!requireNamespace("dplyr")) install.packages("dplyr")
+if(!requireNamespace("ggplot2")) install.packages("ggplot2")
+library(dplyr); library(ggplot2)
+library(readr)
+```
+
+
+## Load Data
+
+```{r load-data}
+train <- read.csv("playground-series-s5e6/train.csv")
+test <- read.csv("playground-series-s5e6/test.csv")
+str(train)
+colnames(train)
+dim(train)
+```
+
+``` {r check-output-distribution, include=FALSE}
+table(train$Fertilizer.Name)
+
+ggplot(train, aes(x = Fertilizer.Name)) +
+  geom_bar(fill="steelblue") +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+```
+
+```{r format-variables, include=FALSE}
+train <- as_tibble(train)
+train <- rename(train, Temperature = Temparature) # fix spelling
+train <- mutate(train,
+                Soil.Type = as.factor(Soil.Type),
+                Crop.Type = as.factor(Crop.Type),
+                Fertilizer.Name = as.factor(Fertilizer.Name))
+```
+
+```{r print-some-info, echo=FALSE}
+
+cat("dim:", paste(dim(train), collapse=" x "), "\n")
+cat("any NA anywhere:", anyNA(train), "\n\n")
+print(colSums(is.na(train)))
+cat("\nunique counts (Soil, Crop, Fertilizer):\n")
+print(sapply(train %>% select(Soil.Type, Crop.Type, Fertilizer.Name), function(x) length(levels(x))))
+cat("\nclass counts for target:\n")
+print(sort(table(train$Fertilizer.Name), decreasing = TRUE))
+cat("\nany duplicated id?:", any(duplicated(train$id)), "\n")
+```
+```{r eda-step2}
+nums <- select_if(train, is.numeric) %>% select(-id)
+print(summary(nums))
+print(sapply(nums, function(x) length(unique(x))))
+set.seed(123); samp <- slice_sample(train, n = 20000)
+ggplot(samp, aes(x = Fertilizer.Name)) + geom_bar() + theme(axis.text.x = element_text(angle=45, hjust=1))
+```
