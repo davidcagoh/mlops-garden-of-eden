@@ -1,0 +1,14 @@
+# Ignore data files
+data/*.csv
+data/*.parquet
+
+# Ignore Jupyter checkpoints
+notebooks/.ipynb_checkpoints/
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore environment files (if you prefer)
+.env
+*.env
