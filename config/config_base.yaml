@@ -1,0 +1,67 @@
+# --- Base Project Configuration ---
+#
+# This file contains all default settings shared across all environments (Dev/Prod).
+# Settings unique to an environment will be overridden by config_dev.yaml or config_prod.yaml.
+
+project_name: "Garden_of_Eden"
+target_column: "Fertilizer_Label" # label name
+random_seed: 42 # Seed for reproducibility.
+
+# --- Data Configuration (Databricks/Delta Lake) ---
+# TODO All config names are examples and should be modified
+data:
+
+  # Base Databricks catalog and schema names
+  catalog_name: "mlops_catalog"
+  schema_name: "fertilizer_db"
+
+  # Table names in Databricks Delta Lake
+  raw_table_name: "raw_fertilizer_data"
+  features_table_name: "processed_features"
+
+  # Path to initial local Kaggle CSV (used only for initial ingestion)
+  local_raw_path: "data/raw_data.csv"
+
+# --- Tuning/Execution Configuration ---
+tuning:
+
+  # List of model names (keys from the 'models' block) to include in the current run/tuning process.
+  # This list defines which experiments are executed.
+  models_to_run:
+    - "RandomForestClassifier"
+    - "XGBoostClassifier"
+
+# --- Model Definitions ---
+models:
+
+
+  RandomForestClassifier:
+    type: "sklearn.ensemble.RandomForestClassifier"
+    hyperparameters:
+      # In prod, these will be overrided with a single value
+      n_estimators: [] # 
+      max_depth: 12
+      min_samples_leaf: 5
+      class_weight: "balanced"
+
+  LogisticRegression:
+    type: "sklearn.linear_model.LogisticRegression"
+    hyperparameters:
+      penalty: "l2"
+      C: 1.0
+      solver: "saga"
+      max_iter: 500
+      class_weight: "balanced"
+
+  XGBoostClassifier:
+    type: "xgboost.XGBClassifier"
+    hyperparameters:
+      n_estimators: 100
+      max_depth: [5, 6, 7]
+      learning_rate: [0.01, 0.1, 0.2] 
+      objective: "multi:softprob"
+
+# --- MLOps/Tracking Configuration ---
+tracking:
+  experiment_name: "Fertilizer_Classification_V1" # The name used for MLflow experiment tracking.
+  mlflow_tracking_uri: "databricks" # Standard URI for Databricks environment integration.
