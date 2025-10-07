@@ -1,6 +1,7 @@
 # Data Folder
 
 This folder stores the dataset files for the Playground Series – Season 5, Episode 6: Predicting Optimal Fertilizers Kaggle competition.
+https://www.kaggle.com/competitions/playground-series-s5e6
 
 ## Files
 * train.csv – training dataset with labeled fertilizer recommendations.

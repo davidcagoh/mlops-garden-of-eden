@@ -1,0 +1,27 @@
+# --- Production Environment Overrides ---
+#
+# This file overrides settings in 'base_config.yaml' for the final, continuous, and validated production pipeline.
+#
+# Primary Goals:
+# 1. Use the full, curated production feature table.
+# 2. Run only the single, approved production model.
+# 3. Lock down final hyperparameters.
+
+data:
+  features_table_name: "processed_features" 
+  
+# --- Tuning/Execution Configuration ---
+tuning:
+  # In Prod, we only execute the pipeline for the one model selected for deployment.
+  models_to_run:
+    - "LogisticRegression"
+
+# --- Model Hyperparameter Locking ---
+# We override the model definition here to ensure only the final, optimal hyperparameters are used.
+models:
+  LogisticRegression:
+    hyperparameters:
+      # We override the potential list from base_config to a single, locked-down value:
+      penalty: "l2"
+      C: 0.85 
+      solver: "saga"

@@ -1,0 +1,25 @@
+# --- Development Environment Overrides ---
+#
+# This file overrides settings in 'base_config.yaml' for fast, local, and isolated development runs.
+#
+# Primary Goals:
+# 1. Use sampled/local data for speed.
+# 2. Run multiple model types for comparative testing.
+# 3. Use a scratchpad MLflow experiment.
+
+data:
+  # In development, point to a small sample dataset for rapid testing
+  features_table_name: "processed_features_SAMPLE_dev"
+  
+# --- Tuning/Execution Configuration ---
+tuning:
+  # In Dev, we want to run all the candidate models to compare performance.
+  models_to_run:
+    - "RandomForestClassifier"
+    - "XGBoostClassifier"
+    - "LogisticRegression"
+
+# --- MLOps/Tracking Configuration ---
+tracking:
+  # Use a separate, temporary experiment for all development runs to keep the production experiment clean.
+  experiment_name: "Garden_of_Eden_DEV_SCRATCHPAD"
