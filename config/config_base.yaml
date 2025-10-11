@@ -4,8 +4,9 @@
 # Settings unique to an environment will be overridden by config_dev.yaml or config_prod.yaml.
 
 project_name: "Garden_of_Eden"
-target_column: "Fertilizer_Label" # label name
+target_column: "Fertilizer Name" # label name
 random_seed: 42 # Seed for reproducibility.
+data_source: "local"    # local | databricks
 
 # --- Data Configuration (Databricks/Delta Lake) ---
 # TODO All config names are examples and should be modified
@@ -22,6 +23,21 @@ data:
   # Path to initial local Kaggle CSV (used only for initial ingestion)
   local_raw_path: "data/raw_data.csv"
 
+  # Path to local training data
+  local_train_data_path: "data/dataset_initial.csv"
+
+  features:
+    numerical: 
+      - "Temparature"
+      - "Humidity"
+      - "Moisture"
+      - "Nitrogen"
+      - "Potassium"
+      - "Phosphorous"
+    categorical:
+      - "Soil Type"
+      - "Crop Type"
+
 # --- Tuning/Execution Configuration ---
 tuning:
 
@@ -29,17 +45,18 @@ tuning:
   # This list defines which experiments are executed.
   models_to_run:
     - "RandomForestClassifier"
+    - "LogisticRegression"
     - "XGBoostClassifier"
+  
+  validation_size: 0.2
 
 # --- Model Definitions ---
 models:
 
-
   RandomForestClassifier:
     type: "sklearn.ensemble.RandomForestClassifier"
     hyperparameters:
-      # In prod, these will be overrided with a single value
-      n_estimators: [] # 
+      n_estimators: 200   # number of trees
       max_depth: 12
       min_samples_leaf: 5
       class_weight: "balanced"
@@ -57,11 +74,16 @@ models:
     type: "xgboost.XGBClassifier"
     hyperparameters:
       n_estimators: 100
-      max_depth: [5, 6, 7]
-      learning_rate: [0.01, 0.1, 0.2] 
+      max_depth: [5, 7]
+      learning_rate: [0.1, 0.2] 
       objective: "multi:softprob"
 
 # --- MLOps/Tracking Configuration ---
 tracking:
   experiment_name: "Fertilizer_Classification_V1" # The name used for MLflow experiment tracking.
   mlflow_tracking_uri: "databricks" # Standard URI for Databricks environment integration.
+
+  # Logging parameters
+  log_settings:
+    level: "INFO" # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    file_path: "logs/pipeline_run.log"

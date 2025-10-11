@@ -1,60 +1,183 @@
-import logging
-from typing import Dict, Any, Tuple
-from src.config_manager import Config
+# src/experiment_runner.py
 
-logger = logging.getLogger(__name__)
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.pipeline import Pipeline 
+from sklearn.preprocessing import LabelEncoder
+from typing import Dict, Any, Tuple
+from xgboost import XGBClassifier
+
+from src.config_manager import Config, ModelConfig
+from src.data_loader import load_training_data
+from src.data_splitter import split_data
+from src.model_utils import get_model_class,  get_hyperparameter_combinations
+from src.preprocessor import create_preprocessor
+from src.utils import logger
 
 class ExperimentRunner:
     """
-    Manages the entire model development lifecycle: data preparation, 
-    hyperparameter tuning, training, and tracking.
+    Manages the entire model development lifecycle.
     """
     def __init__(self, config: Config, env: str):
         self.config = config
         self.env = env
+        self.label_encoder = LabelEncoder()
+        logger.info(f"Initialized Experiment Runner for environment: {self.env}")
 
-    def load_data(self) -> Any:
-        """
-        Reads the clean, intermediate data from the ingestion step.
-        Returns: The loaded dataset object (e.g., Pandas DataFrame).
-        """
-        pass
+    def load_data(self) -> pd.DataFrame:
+        """Reads the clean, intermediate data by calling the dedicated loader."""
+        
+        data_source = self.config.data_source 
+        logger.info(f"Loading data from configured source: {data_source}")
+        
+        data = load_training_data(
+            data_config=self.config.data,
+            source=data_source
+        )
+        return data
 
-    def preprocess_and_feature_engineer(self, data: Any) -> Tuple[Any, Any]:
-        """
-        Applies necessary transformations (scaling, encoding) and creates features.
-        Args:
-            data: The loaded dataset.
-        Returns: 
-            A tuple containing (features, labels).
-        """
-        pass
+    def preprocess_and_feature_engineer(self, df_train: pd.DataFrame, df_val: pd.DataFrame):
+        """Placeholder for feature engineering on split sets."""
+        pass # To be implemented later
 
-    def split_data(self, features: Any, labels: Any) -> Tuple[Any, Any, Any, Any]:
+    def _transform_labels(self, df_train: pd.DataFrame, df_val: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
-        Splits the data into training and testing sets based on the config.
-        Returns: 
-            A tuple containing (X_train, X_test, y_train, y_test).
+        Encodes categorical labels (y) into numerical integers [0, 1, 2, ...].
         """
-        pass
+        target_col = self.config.target_column
 
-    def run_tuning_and_training(self, X_train: Any, y_train: Any) -> str:
+        # FIT and TRANSFORM on Training Data
+        logger.info(f"Fitting LabelEncoder on training labels ({target_col}).")
+        y_train_encoded = self.label_encoder.fit_transform(df_train[target_col])
+        
+        # TRANSFORM only on Validation Data (using the fitted encoder)
+        y_val_encoded = self.label_encoder.transform(df_val[target_col])
+
+        # Replace the original target columns with the encoded values
+        df_train[target_col] = y_train_encoded
+        df_val[target_col] = y_val_encoded
+        
+        logger.info(f"Labels transformed to numerical: {self.label_encoder.classes_}")
+        return df_train, df_val
+
+    def split_data(self, df_raw: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
-        Iterates over models defined in config.tuning.models_to_run,
-        performs hyperparameter search, trains the best model, and logs results 
-        to MLflow.
-        Returns: 
-            The MLflow run_id of the best performing model.
+        Splits the raw data into training and validation sets based on config.
         """
-        pass
+        logger.info("Splitting data into training and validation sets.")
+        
+        df_train, df_val = split_data(
+            df=df_raw,
+            target_column=self.config.target_column,
+            validation_size=self.config.tuning.validation_size,
+            random_seed=self.config.random_seed
+        )
+        logger.info(f"Train set size: {len(df_train)}, Validation set size: {len(df_val)}")
+        return df_train, df_val
+
+    def run_tuning_and_training(self, df_train: pd.DataFrame, df_val: pd.DataFrame) -> str:
+        logger.info("Starting model training and hyperparameter exploration cycle.")
+        
+        X_train = df_train.drop(columns=[self.config.target_column])
+        y_train = df_train[self.config.target_column]
+        X_val = df_val.drop(columns=[self.config.target_column])
+        y_val = df_val[self.config.target_column]
+
+        results = {}
+        best_accuracy = -1
+        best_run_name = ""
+        
+        # Outer Loop: Iterate over all configured models 
+        for model_name in self.config.tuning.models_to_run:
+            logger.info(f"--- Processing model: {model_name} ---")
+            
+            try:
+                model_config: ModelConfig = getattr(self.config.models, model_name)
+                ModelClass = get_model_class(model_config.type)
+            except Exception as e:
+                logger.error(f"Failed to set up model {model_name}. Error: {e}")
+                continue
+
+            # Generate all hyperparameter combinations (Grid Search)
+            hp_combinations = get_hyperparameter_combinations(model_config.hyperparameters)
+            logger.info(f"Generated {len(hp_combinations)} hyperparameter combination(s) for {model_name}.")
+
+            # Inner Loop: Iterate over each hyperparameter combination
+            for i, hyperparams in enumerate(hp_combinations):
+                run_name = f"{model_name}_Run_{i + 1}"
+                logger.info(f"Starting run: {run_name} with HPs: {hyperparams}")
+                
+                # Build Full Pipeline and Instantiate Model
+                
+                # Instantiate the model with the specific combination of hyperparameters
+                classifier = ModelClass(random_state=self.config.random_seed, **hyperparams)
+                
+                # Create the reusable preprocessor
+                numerical_features = self.config.data.features.numerical
+                categorical_features = self.config.data.features.categorical
+                preprocessor = create_preprocessor(numerical_features, categorical_features)
+
+                full_pipeline = Pipeline(steps=[
+                    ('preprocessor', preprocessor),
+                    ('classifier', classifier)
+                ])
+
+                # Training
+                full_pipeline.fit(X_train, y_train)
+
+                # Evaluation on Validation Set
+                y_pred_val = full_pipeline.predict(X_val)
+                accuracy = accuracy_score(y_val, y_pred_val)
+                logger.info(f"Validation Accuracy: {accuracy:.4f}")
+
+                # Store Results and Track Best Model
+                # NOTE: In MLFlow you will log model_name, hyperparams, and metrics for this run
+                results[run_name] = {"accuracy": accuracy, "model": full_pipeline}
+                
+                if accuracy > best_accuracy:
+                    best_accuracy = accuracy
+                    best_run_name = run_name
+
+        logger.info(f"--- All experiments finished. Best run: {best_run_name} (Accuracy: {best_accuracy:.4f}) ---")
+        
+        return f"Placeholder_RunID_{best_run_name}"
 
     def run_experiment_pipeline(self) -> str:
         """
-        Orchestrates the entire experiment process: Load -> Preprocess -> Split -> Train.
+        Orchestrates the entire experiment process: Load -> Split -> Train.
+        
         Returns:
-            The MLflow run_id of the best model.
+            The unique identifier (run_id) of the best model's experiment.
         """
-        pass
+        logger.info("Starting MLOps experiment pipeline orchestration.")
+        
+        try:
+            # Load Data
+            df_raw = self.load_data()
+            
+            # Split Data
+            df_train, df_val = self.split_data(df_raw)
+
+            # Transform Labels
+            df_train, df_val = self._transform_labels(df_train, df_val)
+            
+            # Preprocess and Train (The Core Experimentation)
+            # Calls the method that loops through models, preprocesses, trains, and evaluates
+            best_run_id = self.run_tuning_and_training(df_train, df_val)
+            
+            logger.info("Pipeline execution completed successfully.")
+            return best_run_id
+
+        except NotImplementedError as e:
+            logger.warning(f"Pipeline skipped critical stage: {e}")
+            logger.warning("Execution terminated gracefully due to unimplemented feature.")
+            raise
+
+        except Exception as e:
+            logger.critical(f"Pipeline terminated with a CRITICAL failure: {e}", exc_info=True)
+            raise
 
 def run_experiment_stage(config: Config, env: str) -> str:
     """
@@ -62,9 +185,3 @@ def run_experiment_stage(config: Config, env: str) -> str:
     """
     runner = ExperimentRunner(config, env)
     return runner.run_experiment_pipeline()
-
-
-if __name__ == '__main__':
-    # Execution for local testing/debugging
-    from src.config_manager import get_config
-    run_experiment_stage(get_config(env='dev'), env='dev')
