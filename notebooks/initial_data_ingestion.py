@@ -100,14 +100,14 @@ df_raw.write.mode("overwrite").saveAsTable(raw_table)
 print(f"Raw data saved to table: {raw_table}")
 
 # Load and save initial cleaned data
-df_initial = pd.read_csv(os.path.join(os.getcwd(), TEST_SET_OUTPUT_PATH))
+df_initial = pd.read_csv(os.path.join(os.getcwd(), INITIAL_DATASET_OUTPUT_PATH))
 df_initial = spark.createDataFrame(df_initial)
 df_initial.write.mode("overwrite").saveAsTable(intermediate_table)
 print(f"Initial cleaned data saved to table: {intermediate_table}")
 
 # Create and save features table
-df_features = df_initial.select(config.data.features.numerical + config.data.features.categorical)
-df_features.write.mode("overwrite").saveAsTable(features_table)
+df_features = df_initial.select(config.data.features.numerical + config.data.features.categorical + [TARGET_COLUMN])
+df_features.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(features_table)
 print(f"Feature data saved to table: {features_table}")
 
 print("Data ingestion pipeline completed successfully")
