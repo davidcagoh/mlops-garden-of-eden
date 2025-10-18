@@ -27,6 +27,11 @@ data:
   local_train_data_path: "data/dataset_initial.csv"
   local_test_data_path: "data/test_set.csv"
 
+  meta_features:
+    - "id"
+    - "_source"
+    - "_ingestion_timestamp"
+
   features:
     numerical: 
       - "temperature"

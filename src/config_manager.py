@@ -38,6 +38,7 @@ class DataConfig:
     local_train_data_path: str
     local_test_data_path: str
     features: FeatureConfig
+    meta_features: List[str]
     intermediate_clean_table: str = "cleaned_data" # Field with default comes last
 
 @dataclass(frozen=True)
