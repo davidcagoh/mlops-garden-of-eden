@@ -1,7 +1,14 @@
+import os
+import uuid
 import pandas as pd
+from typing import Optional
+import requests
+import gdown
+import argparse
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-from src.config_manager import Config, DataConfig
+from src.config_manager import Config, DataConfig, get_config
+
 
 def clean_data(config: Config, df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -47,7 +54,12 @@ def ingest_data(config: Config, file_path: str, source: str = "local") -> None:
     """
     data_config = config.data
     spark = SparkSession.builder.appName("DataIngestion").getOrCreate()
-    df = pd.read_csv(file_path)
+    try:
+        df = pd.read_csv(file_path)
+    except Exception as e:
+        print(f"Error reading {file_path}: {e}")
+        return
+
     df.columns = [col.strip().lower().replace(" ", "_").replace("temparature", "temperature") for col in df.columns]
     
     # === BRONZE: Raw table with metadata ===
@@ -116,3 +128,50 @@ def ingest_data(config: Config, file_path: str, source: str = "local") -> None:
         featured_df.write.mode('overwrite').option("mergeSchema", "true").saveAsTable(f'{data_config.catalog_name}.{data_config.schema_name}.{data_config.features_table_name}')
     except Exception:
         ingested_featured_df.write.mode('overwrite').option("mergeSchema", "true").saveAsTable(f'{data_config.catalog_name}.{data_config.schema_name}.{data_config.features_table_name}')
+
+
+def download_file(url: str, save_path: str) -> bool:
+    """
+    Downloads file from a specified URL and saves it to a local path.
+
+    Parameters:
+    url (str): The URL to download the data from.
+    save_path (str): The local file path to save the downloaded data.
+
+    Returns:
+    bool: Success status of the download.
+    """
+    try:
+        if "drive.google.com" in url:
+            file_id = url.split('/')[-2]
+            gdown.download(f'https://drive.google.com/uc?id={file_id}', save_path, quiet=False)
+            return True
+        else:
+            response = requests.get(url)
+            with open(save_path, 'wb') as file:
+                file.write(response.content)
+            return True
+    except Exception as e:
+        print(f"Error downloading file: {e}")
+        return False
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Data Ingestion Script")
+    parser.add_argument('--file_path', type=str, help='URL or path of the data source')
+    parser.add_argument('--source', type=str, default='local', help='Source type of the data. Will attempt to download if not local.')
+    return parser.parse_args()
+
+def main():
+    args = parse_args()
+    config = get_config()
+    data_url = args.file_path
+    
+    tmp_path = os.path.join('data', f'{uuid.uuid4().hex}.csv')
+
+    if args.source == 'local':
+        ingest_data(config, data_url, source='local')
+    elif download_file(data_url, tmp_path):
+        ingest_data(config, tmp_path, source=args.source)
+
+if __name__ == "__main__":
+    main()
