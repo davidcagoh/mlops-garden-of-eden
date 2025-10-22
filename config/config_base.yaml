@@ -24,7 +24,7 @@ data:
   local_raw_path: "data/raw_data.csv"
 
   # Path to local training data
-  local_train_data_path: "data/dataset_initial.csv"
+  local_train_data_path: "data/dataset_small.csv"
 
   features:
     numerical: 
@@ -37,6 +37,15 @@ data:
     categorical:
       - "Soil Type"
       - "Crop Type"
+
+# --- Feature Engineering ---
+feature_engineering:
+  enable: true
+  operations:
+    - output: "NPK_Ratio"
+      formula: "Nitrogen / (Phosphorous + Potassium + 1e-5)"
+    - output: "Moisture_Humidity_Diff"
+      formula: "Moisture - Humidity"
 
 # --- Tuning/Execution Configuration ---
 tuning:
