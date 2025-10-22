@@ -46,6 +46,8 @@ feature_engineering:
       formula: "Nitrogen / (Phosphorous + Potassium + 1e-5)"
     - output: "Moisture_Humidity_Diff"
       formula: "Moisture - Humidity"
+    - output: "Moisture_Temp_Humidity_Interaction"
+      formula: "Moisture * Temparature * Humidity"
 
 # --- Tuning/Execution Configuration ---
 tuning:

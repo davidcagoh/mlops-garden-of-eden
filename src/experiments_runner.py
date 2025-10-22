@@ -15,6 +15,8 @@ from src.data_splitter import split_data
 from src.model_utils import get_model_class,  get_hyperparameter_combinations
 from src.preprocessor import create_preprocessor
 from src.utils import logger
+from itertools import combinations
+
 
 class ExperimentRunner:
     """
@@ -63,11 +65,11 @@ class ExperimentRunner:
                 df_train[output_col] = df_train.eval(formula)
                 df_val[output_col] = df_val.eval(formula)
                 applied_features.append(output_col)  # <-- track the feature
-                logger.info(f"Created feature '{output_col}' using formula: {formula}")
+                logger.info(f"Created numeric feature '{output_col}' using formula: {formula}")
             except Exception as e:
-                logger.warning(f"Failed to create feature '{output_col}': {e}")
+                logger.warning(f"Failed to create numeric feature '{output_col}': {e}")
 
-        logger.info(f"Features successfully applied this run: {applied_features}") #<-- print
+        logger.info(f"Numeric features successfully applied this run: {applied_features}") #<-- print
 
         return df_train, df_val, applied_features
 
