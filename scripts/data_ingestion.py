@@ -148,7 +148,7 @@ def ingest_data(config: Config, file_path: str, source: str = "local") -> None:
             if col not in silver_keep_cols:
                 cleaned_df = cleaned_df.drop(col)
 
-        cleaned_df = cleaned_df.union(ingested_cleaned_df)
+        cleaned_df = cleaned_df.dropDuplicates(["id"])
         cleaned_df.write.mode("overwrite").option("mergeSchema", "true").saveAsTable(
             f"{data_config.catalog_name}.{data_config.schema_name}."
             f"{data_config.intermediate_clean_table}"
@@ -184,7 +184,7 @@ def ingest_data(config: Config, file_path: str, source: str = "local") -> None:
             if col not in gold_keep_cols:
                 featured_df = featured_df.drop(col)
 
-        featured_df = featured_df.union(ingested_featured_df)
+        featured_df = featured_df.dropDuplicates(["id"])
         featured_df.write.mode("overwrite").option("mergeSchema", "true").saveAsTable(
             f"{data_config.catalog_name}.{data_config.schema_name}."
             f"{data_config.features_table_name}"
